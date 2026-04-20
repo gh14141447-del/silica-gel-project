@@ -1,0 +1,36 @@
+/* album.css 또는 style.css */
+.album-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 95px;
+  transform: translateX(-50%) translateY(10px);
+  font-size: 1.17em;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #000;
+  white-space: nowrap;
+  text-align: center;
+  opacity: 0;
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.album-caption.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.album-caption.hide {
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px);
+}
+
+@media (max-width: 900px) {
+  .album-caption {
+    bottom: 82px;
+    font-size: 1em;
+  }
+}
