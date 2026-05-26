@@ -5,38 +5,136 @@
   <meta charset="UTF-8" />
   <title>Silica Gel - Precision Motion Control</title>
   <style>
-    /* 기본 레이아웃 유지 */
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
-      cursor: none;
     }
 
     body {
       width: 100%;
       height: 100vh;
       overflow: hidden;
-      background: #ffffff;
+      background: #0a0a0a;
+      color: #e0e0e0;
       font-family: "Pretendard", sans-serif;
     }
 
-    #finger-cursor {
-      position: fixed;
-      width: 24px;
-      height: 24px;
-      background: rgba(0, 0, 0, 0.2);
-      border: 2px solid #000;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 10000;
+    /* 2단계 메인 화면 진입 시 활성화되는 흐르는 메탈릭 그라데이션 */
+    body.main-active {
+      background: linear-gradient(135deg,
+          #050505 0%,
+          #111113 25%,
+          #252529 45%,
+          #2a2a30 50%,
+          #252529 55%,
+          #111113 75%,
+          #050505 100%);
+      background-size: 400% 400%;
+      animation: metalFlow 20s ease infinite;
     }
 
+    @keyframes metalFlow {
+      0% {
+        background-position: 0% 50%;
+      }
+
+      50% {
+        background-position: 100% 50%;
+      }
+
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+
+    /* 오프닝 파티클 캔버스 */
+    #particleCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 9000;
+      pointer-events: auto;
+      transition: opacity 1s ease;
+    }
+
+    /* 글자가 으스러지면 나타날 히든 스타 버튼 */
+    #hiddenStarBtn {
+      position: absolute;
+      z-index: 9500;
+      background: none;
+      border: none;
+      color: #ffffff;
+      font-size: 24px;
+      cursor: pointer;
+      opacity: 0;
+      display: none;
+      transform: translate(-50%, -50%) scale(0.5);
+      transition: opacity 0.8s ease, transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      text-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+    }
+
+    #hiddenStarBtn.show {
+      display: block;
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    #hiddenStarBtn:hover {
+      transform: translate(-50%, -50%) scale(1.3);
+      color: #dfdfdf;
+    }
+
+    /* 본 메인 콘텐츠 영역 (초기에는 숨김) */
     .gallery {
       position: relative;
       width: 100%;
       height: 100vh;
       perspective: 1500px;
+      z-index: 10;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1s ease;
+    }
+
+    .gallery.view-ready {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* 💡 마우스 커서 차단 해제: 하이브리드 제어를 위해 기본 커서 유지 및 포인팅 환경 개선 */
+    body.album-active {
+      cursor: default !important;
+    }
+
+    #pointer-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10000;
+      display: none;
+    }
+
+    #webcam {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 180px;
+      height: 135px;
+      background: #000;
+      border-radius: 12px;
+      z-index: 5000;
+      transform: scaleX(-1);
+      object-fit: cover;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      pointer-events: none;
     }
 
     .starter {
@@ -47,15 +145,15 @@
       height: 300px;
       transform: translate(-50%, -50%);
       z-index: 10;
-      transition: 1.3s;
-      cursor: none;
+      transition: 1.3s cubic-bezier(0.19, 1, 0.22, 1);
+      cursor: pointer;
     }
 
     .starter img {
       width: 100%;
       height: 100%;
       object-fit: contain;
-      mix-blend-mode: multiply;
+      filter: invert(1);
     }
 
     .gallery.active .starter {
@@ -71,13 +169,30 @@
       height: 300px;
       opacity: 0;
       pointer-events: none;
+      background: none;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
     }
 
     .card img {
       width: 100%;
       height: 100%;
       object-fit: contain;
-      mix-blend-mode: multiply;
+      filter: invert(0.85) drop-shadow(1px 1px 0px rgba(255, 255, 255, 0.7)) drop-shadow(-1px -1px 0px rgba(0, 0, 0, 0.8)) contrast(1.4) brightness(1.1);
+      opacity: 0.75;
+      transition: all 0.4s ease;
+    }
+
+    .card:hover img {
+      opacity: 1;
+      filter: invert(0.95) drop-shadow(2px 2px 2px rgba(255, 255, 255, 0.9)) contrast(1.6) brightness(1.3);
+      transform: scale(1.02);
     }
 
     .card1 {
@@ -112,11 +227,109 @@
       animation: cloneSplit 1.5s cubic-bezier(0.19, 1, 0.22, 1) forwards;
     }
 
-    /* 앨범 뷰 */
+    .label-btn {
+      position: absolute;
+      bottom: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(0, 0, 0, 0.7);
+      color: #999999;
+      padding: 6px 16px;
+      font-weight: bold;
+      border-radius: 4px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .label-btn:hover {
+      transform: translateX(-50%) scale(1.05);
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.1);
+      border-color: #ffffff;
+    }
+
+    .re-back-btn {
+      position: absolute;
+      top: 40px;
+      left: 40px;
+      background: none;
+      border: none;
+      color: #555555;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      cursor: pointer;
+      transition: color 0.3s, transform 0.3s;
+      z-index: 4500;
+    }
+
+    .re-back-btn:hover {
+      color: #ffffff;
+      transform: translateX(-3px);
+    }
+
+    #menuClose {
+      display: none;
+    }
+
+    .gallery.active #menuClose {
+      display: block;
+    }
+
+    /* 라이브 인포 구역 */
+    .gig-view {
+      position: absolute;
+      inset: 0;
+      background: #0a0a0a;
+      opacity: 0;
+      visibility: hidden;
+      z-index: 2500;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: 0.5s;
+      padding: 40px;
+    }
+
+    .gig-view.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .gig-container {
+      width: 100%;
+      max-width: 600px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 30px 0;
+      margin-top: 20px;
+    }
+
+    .gig-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 18px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .gig-date {
+      color: #666666;
+      font-weight: bold;
+      font-family: monospace;
+    }
+
+    .gig-title {
+      color: #ffffff;
+      font-weight: 800;
+    }
+
+    /* 앨범 캐러셀 구역 */
     .album-view {
       position: absolute;
       inset: 0;
-      background: #fff;
+      background: #0a0a0a;
       opacity: 0;
       visibility: hidden;
       z-index: 2000;
@@ -131,48 +344,60 @@
       visibility: visible;
     }
 
+    /* 💡 바이브 코딩 대응형 스타일링: 마우스 제어 시 호버 가시성 확보 */
     .album-item {
       position: absolute;
       width: 360px;
       aspect-ratio: 1/1;
-      transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.6s;
+      transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.6s, box-shadow 0.3s ease, filter 0.3s ease;
       opacity: 0;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
     }
 
     .album-item img {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transition: transform 0.4s ease-in-out;
+      pointer-events: none;
     }
 
     .album-item.center {
       transform: scale(1.1);
       opacity: 1;
       z-index: 5;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
     }
 
     .album-item.left-1 {
       transform: translateX(-450px) scale(0.7);
-      opacity: 0.5;
+      opacity: 0.2;
     }
 
     .album-item.right-1 {
       transform: translateX(450px) scale(0.7);
-      opacity: 0.5;
+      opacity: 0.2;
+    }
+
+    /* 💡 마우스 호버 및 포커스 상태 시 메탈릭 아웃라인 발광 효과 */
+    .album-item.center:hover,
+    .album-item.center.focused {
+      transform: scale(1.15);
+      box-shadow: 0 0 30px rgba(255, 255, 255, 0.25), 0 30px 60px rgba(0, 0, 0, 0.9);
+      border-color: rgba(255, 255, 255, 0.6);
     }
 
     @keyframes pulseScale {
       0% {
-        transform: scale(1.1);
+        transform: scale(1.15);
       }
 
       50% {
-        transform: scale(1.25);
+        transform: scale(1.18);
       }
 
       100% {
-        transform: scale(1.1);
+        transform: scale(1.15);
       }
     }
 
@@ -180,18 +405,20 @@
       animation: pulseScale 1.2s infinite ease-in-out;
     }
 
-    /* 상세 페이지 */
+    /* 상세 정보 구역 */
     .detail-view {
       position: absolute;
       inset: 0;
-      background: #fff;
+      background: #0a0a0a;
       z-index: 3000;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       opacity: 0;
       visibility: hidden;
       transition: 0.5s;
+      padding: 40px;
     }
 
     .detail-view.active {
@@ -199,89 +426,86 @@
       visibility: visible;
     }
 
-    #webcam {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      width: 180px;
-      height: 135px;
+    #detailMediaContainer {
+      width: 100%;
+      max-width: 640px;
+      aspect-ratio: 16/9;
+      margin-bottom: 40px;
       background: #000;
-      border-radius: 12px;
-      z-index: 5000;
-      transform: scaleX(-1);
-      object-fit: cover;
-      border: 2px solid #fff;
-      opacity: 0.6;
+      border: 1px solid rgba(255, 255, 255, 0.15);
     }
 
-    /* 버튼 스타일 및 강조 */
-    .label-btn,
-    #albumClose,
-    #detailClose {
-      cursor: pointer;
-      pointer-events: auto;
-      z-index: 4000;
-      transition: all 0.3s;
+    #detailMediaContainer iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
     }
 
-    #albumClose {
-      position: absolute;
-      top: 40px;
-      left: 40px;
-      padding: 12px 24px;
-      background: #000;
-      color: #fff;
-      border: 2px solid #fff;
-      border-radius: 30px;
-      font-weight: bold;
-    }
-
-    .btn-hovered {
-      transform: scale(1.1) !important;
-      color: #ff0000 !important;
-      font-weight: 900 !important;
-      background: #eee !important;
+    #detailTitle {
+      font-size: 2.2rem;
+      font-weight: 900;
+      margin-bottom: 25px;
+      color: #ffffff;
+      letter-spacing: -0.5px;
     }
   </style>
 </head>
 
 <body>
-  <div id="finger-cursor"></div>
+
+  <canvas id="particleCanvas"></canvas>
+  <button id="hiddenStarBtn">★</button>
+
+  <canvas id="pointer-canvas"></canvas>
   <video id="webcam" autoplay playsinline></video>
 
   <div class="gallery" id="gallery">
+    <button class="re-back-btn" id="menuClose">re:</button>
+
     <div class="starter" id="starter"><img src="images/logo.png"></div>
-    <div class="card card1"><img src="images/logo.png"><button class="label-btn"
-        style="position:absolute; bottom:-30px; left:50%; transform:translateX(-50%); border:none; background:none; font-weight:bold;">Silica
-        gel</button></div>
-    <div class="card card2"><img src="images/logo.png"><button class="label-btn"
-        style="position:absolute; bottom:-30px; left:50%; transform:translateX(-50%); border:none; background:none; font-weight:bold;">Members</button>
-    </div>
-    <div class="card card3"><img src="images/logo.png"><button class="label-btn album-open-btn"
-        style="position:absolute; bottom:-30px; left:50%; transform:translateX(-50%); border:none; background:none; font-weight:bold;">Album</button>
-    </div>
-    <div class="card card4"><img src="images/logo.png"><button class="label-btn"
-        style="position:absolute; bottom:-30px; left:50%; transform:translateX(-50%); border:none; background:none; font-weight:bold;">Untitle</button>
-    </div>
+
+    <div class="card card1"><img src="images/logo.png"><button class="label-btn gig-open-btn">Silica gel</button></div>
+    <div class="card card2"><img src="images/logo.png"><button class="label-btn">Members</button></div>
+    <div class="card card3"><img src="images/logo.png"><button class="label-btn album-open-btn">Album</button></div>
+    <div class="card card4"><img src="images/logo.png"><button class="label-btn">Untitle</button></div>
+
+    <section class="gig-view" id="gigView">
+      <button class="re-back-btn" id="gigClose">re:</button>
+      <h1 style="font-size: 2.5rem; font-weight: 900; letter-spacing: -1px; color:#fff;">LIVE INFO</h1>
+      <p style="color: #666;">Silica Gel Upcoming Performances</p>
+      <div class="gig-container">
+        <div class="gig-item"><span class="gig-date">2026.06.12</span><span class="gig-title">SILICA GEL 'POWER GIG' IN
+            SEOUL</span></div>
+        <div class="gig-item"><span class="gig-date">2026.07.05</span><span class="gig-title">MIDNIGHT SUMMER
+            FESTIVAL</span></div>
+        <div class="gig-item"><span class="gig-date">2026.08.21</span><span class="gig-title">PENTAPORT ROCK FESTIVAL
+            2026</span></div>
+      </div>
+    </section>
 
     <section class="album-view" id="albumView">
       <div class="album-stage"
         style="position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center;">
-        <div class="album-item" data-title="2024 Silica Gel"><img src="images/2024_SilicaGel1.jpeg"></div>
-        <div class="album-item" data-title="2025 Silica Gel"><img src="images/2025_Silicagel.jpg"></div>
-        <div class="album-item" data-title="Machine Boy"><img src="images/20344913.jpg"></div>
-        <div class="album-item" data-title="Kyo181"><img src="images/IMG_7318.WEBP"></div>
-        <div class="album-item" data-title="Desert Eagle"><img src="images/80670374_1440052724930_1_600x600.JPG"></div>
+        <div class="album-item" data-title="2024 Silica Gel" data-video="https://www.youtube.com/embed/SgT_GleYVkw"><img
+            src="images/2024_SilicaGel1.jpeg"></div>
+        <div class="album-item" data-title="2025 Silica Gel" data-video="https://www.youtube.com/embed/14wMkyz6F74"><img
+            src="images/2025_Silicagel.jpg"></div>
+        <div class="album-item" data-title="Machine Boy" data-video="https://www.youtube.com/embed/8bIWeS62SjE"><img
+            src="images/20344913.jpg"></div>
+        <div class="album-item" data-title="Kyo181" data-video="https://www.youtube.com/embed/nshv-oU9vN0"><img
+            src="images/IMG_7318.WEBP"></div>
+        <div class="album-item" data-title="Desert Eagle" data-video="https://www.youtube.com/embed/kS889zP2Y_0"><img
+            src="images/80670374_1440052724930_1_600x600.JPG"></div>
       </div>
-      <button id="albumClose">CLOSE LIST</button>
     </section>
 
     <section class="detail-view" id="detailView">
-      <div style="text-align:center;">
-        <h1 id="detailTitle" style="font-size:3rem; margin-bottom:20px;">Album Detail</h1>
-        <button id="detailClose"
-          style="padding:15px 40px; background: #333; color: white; border: none; border-radius: 10px; font-weight: bold;">BACK
-          TO ALBUMS</button>
+      <button class="re-back-btn" id="detailClose">re:</button>
+      <h1 id="detailTitle">Album Title</h1>
+      <div id="detailMediaContainer">
+        <iframe id="detailIframe"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen></iframe>
       </div>
     </section>
   </div>
@@ -289,12 +513,219 @@
   <script type="module">
     import { GestureRecognizer, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
 
-    const cursor = document.getElementById("finger-cursor");
+    /* ==========================================================
+       1. 타이포그래피 면-모래 전환 및 히든 스타 레이어 엔진
+       ========================================================== */
+    const pCanvas = document.getElementById("particleCanvas");
+    const pCtx = pCanvas.getContext("2d");
+    const starBtn = document.getElementById("hiddenStarBtn");
+
+    let opParticles = [];
+    const pMouse = { x: null, y: null, radius: 85 };
+
+    let targetX = 0, targetY = 0;
+    let starSpawned = false;
+    let starVisible = false;
+
+    const textImg = new Image();
+    textImg.crossOrigin = "Anonymous";
+    textImg.src = "images/web_text.png";
+
+    window.addEventListener("mousemove", (e) => {
+      pMouse.x = e.clientX;
+      pMouse.y = e.clientY;
+    });
+
+    window.addEventListener("mouseout", () => {
+      pMouse.x = null;
+      pMouse.y = null;
+    });
+
+    class OpParticle {
+      constructor(x, y, isTarget) {
+        this.x = x;
+        this.y = y;
+        this.destX = x;
+        this.destY = y;
+        this.isTarget = isTarget;
+        this.size = 2.0;
+        this.vx = 0;
+        this.vy = 0;
+        this.friction = 0.85;
+        this.ease = 0.08;
+        this.color = "rgba(255, 255, 255, 1)";
+        this.isMoved = false;
+      }
+      update() {
+        this.vx += (this.destX - this.x) * this.ease;
+        this.vy += (this.destY - this.y) * this.ease;
+        this.isMoved = false;
+
+        if (pMouse.x !== null && pMouse.y !== null) {
+          let dx = this.x - pMouse.x;
+          let dy = this.y - pMouse.y;
+          let dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < pMouse.radius) {
+            let force = (pMouse.radius - dist) / pMouse.radius;
+            let angle = Math.atan2(dy, dx);
+            this.vx += Math.cos(angle) * force * 14 * (Math.random() * 0.6 + 0.7);
+            this.vy += Math.sin(angle) * force * 14 * (Math.random() * 0.6 + 0.7);
+            this.isMoved = true;
+          }
+        }
+
+        this.vx *= this.friction;
+        this.vy *= this.friction;
+        this.x += this.vx;
+        this.y += this.vy;
+      }
+      draw() {
+        pCtx.fillStyle = this.color;
+        pCtx.fillRect(this.x, this.y, this.size, this.size);
+      }
+    }
+
+    function initOpCanvas() {
+      pCanvas.width = window.innerWidth;
+      pCanvas.height = window.innerHeight;
+
+      if (!textImg.complete) return;
+
+      const scale = Math.min(pCanvas.width / textImg.width, pCanvas.height / textImg.height) * 0.85;
+      const imgWidth = textImg.width * scale;
+      const imgHeight = textImg.height * scale;
+      const imgX = (pCanvas.width - imgWidth) / 2;
+      const imgY = (pCanvas.height - imgHeight) / 2;
+
+      pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+      pCtx.drawImage(textImg, imgX, imgY, imgWidth, imgHeight);
+
+      const imgData = pCtx.getImageData(0, 0, pCanvas.width, pCanvas.height);
+      pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+
+      opParticles = [];
+
+      let minY = pCanvas.height, maxY = 0;
+      for (let y = 0; y < imgData.height; y += 2) {
+        for (let x = 0; x < imgData.width; x += 2) {
+          const index = (y * imgData.width + x) * 4;
+          const r = imgData.data[index];
+          const g = imgData.data[index + 1];
+          const b = imgData.data[index + 2];
+          const alpha = imgData.data[index + 3];
+
+          if (alpha > 128 && (r > 30 || g > 30 || b > 30)) {
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      const midY = minY + (maxY - minY) / 2;
+      const validTargets = [];
+
+      for (let y = 0; y < imgData.height; y += 2) {
+        for (let x = 0; x < imgData.width; x += 2) {
+          const index = (y * imgData.width + x) * 4;
+          const r = imgData.data[index];
+          const g = imgData.data[index + 1];
+          const b = imgData.data[index + 2];
+          const alpha = imgData.data[index + 3];
+
+          if (alpha > 128 && (r > 40 || g > 40 || b > 40) && y < midY) {
+            if (x > imgX + imgWidth * 0.3 && x < imgX + imgWidth * 0.7 && y > midY - 50 && y < midY - 10) {
+              validTargets.push({ x, y });
+            }
+            opParticles.push(new OpParticle(x, y, false));
+          }
+        }
+      }
+
+      if (validTargets.length > 0 && targetX === 0) {
+        const randomPick = validTargets[Math.floor(Math.random() * validTargets.length)];
+        targetX = randomPick.x;
+        targetY = randomPick.y;
+        starBtn.style.left = `${targetX}px`;
+        starBtn.style.top = `${targetY}px`;
+      }
+    }
+
+    textImg.onload = () => {
+      initOpCanvas();
+      animateOp();
+    };
+
+    function animateOp() {
+      if (starSpawned) return;
+      pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+
+      let targetAreaHedged = false;
+      let targetAreaDestroyed = false;
+
+      if (pMouse.x !== null && pMouse.y !== null && targetX !== 0) {
+        let dx = targetX - pMouse.x;
+        let dy = targetY - pMouse.y;
+        let dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < pMouse.radius) { targetAreaHedged = true; }
+      }
+
+      for (let i = 0; i < opParticles.length; i++) {
+        const p = opParticles[i];
+        p.update();
+        p.draw();
+
+        if (p.isMoved && targetX !== 0) {
+          let pdx = p.destX - targetX;
+          let pdy = p.destY - targetY;
+          if (Math.sqrt(pdx * pdx + pdy * pdy) < 25) { targetAreaDestroyed = true; }
+        }
+      }
+
+      if (targetAreaHedged && targetAreaDestroyed && !starSpawned) {
+        if (!starVisible) {
+          starBtn.classList.add("show");
+          starVisible = true;
+        }
+      } else {
+        if (starVisible) {
+          starBtn.classList.remove("show");
+          starVisible = false;
+        }
+      }
+
+      requestAnimationFrame(animateOp);
+    }
+
+    starBtn.onclick = () => {
+      starSpawned = true;
+      starBtn.classList.remove("show");
+      pCanvas.style.opacity = "0";
+
+      setTimeout(() => {
+        pCanvas.style.display = "none";
+        starBtn.style.display = "none";
+        document.body.classList.add("main-active");
+        document.getElementById("gallery").classList.add("view-ready");
+      }, 1000);
+    };
+
+    window.addEventListener("resize", () => { initOpCanvas(); });
+
+
+    /* ==========================================================
+       2. 메인 미디어 및 핸드 트래킹 모듈 (바이브 코딩 하이브리드 제어)
+       ========================================================== */
+    const canvas = document.getElementById("pointer-canvas");
+    const ctx = canvas.getContext("2d");
     const video = document.getElementById("webcam");
     const albumView = document.getElementById("albumView");
     const detailView = document.getElementById("detailView");
+    const gigView = document.getElementById("gigView");
     const albumItems = document.querySelectorAll(".album-item");
     const gallery = document.getElementById("gallery");
+    const detailIframe = document.getElementById("detailIframe");
+    const detailTitle = document.getElementById("detailTitle");
 
     let gestureRecognizer;
     let lastVideoTime = -1;
@@ -302,144 +733,132 @@
     let isCooldown = false;
     let prevHandX = 0;
     let stopCounter = 0;
+    let particles = [];
+    let currentTargetX = 0;
+    let currentTargetY = 0;
 
-    // UI 제어 함수들
-    const openAlbums = () => { albumView.classList.add("open"); updateCarousel(); };
-    const closeAlbums = () => { albumView.classList.remove("open"); };
-    const closeDetail = () => { detailView.classList.remove("active"); };
+    function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    function drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius, alpha) {
+      let rot = Math.PI / 2 * 3; let x = cx; let y = cy; let step = Math.PI / spikes;
+      ctx.beginPath(); ctx.moveTo(cx, cy - outerRadius);
+      for (let i = 0; i < spikes; i++) {
+        x = cx + Math.cos(rot) * outerRadius; y = cy + Math.sin(rot) * outerRadius; ctx.lineTo(x, y); rot += step;
+        x = cx + Math.cos(rot) * innerRadius; y = cy + Math.sin(rot) * innerRadius; ctx.lineTo(x, y); rot += step;
+      }
+      ctx.lineTo(cx, cy - outerRadius); ctx.closePath(); ctx.fillStyle = `rgba(212, 215, 217, ${alpha})`; ctx.fill();
+    }
+
+    function renderPointer() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (document.body.classList.contains("album-active") && !detailView.classList.contains("active")) {
+        if (currentTargetX !== 0 && currentTargetY !== 0) { particles.push({ x: currentTargetX, y: currentTargetY, size: 10 + Math.random() * 6, alpha: 0.8 }); }
+        for (let i = particles.length - 1; i >= 0; i--) {
+          let p = particles[i]; p.alpha -= 0.04; p.size *= 0.95;
+          if (p.alpha <= 0) { particles.splice(i, 1); } else { drawStar(ctx, p.x, p.y, 5, p.size, p.size / 2, p.alpha); }
+        }
+        if (currentTargetX !== 0 && currentTargetY !== 0) { drawStar(ctx, currentTargetX, currentTargetY, 5, 16, 8, 1.0); }
+      }
+      requestAnimationFrame(renderPointer);
+    }
+    renderPointer();
+
+    const openAlbums = () => { albumView.classList.add("open"); document.body.classList.add("album-active"); updateCarousel(); video.style.opacity = "0.4"; canvas.style.display = "block"; };
+    const closeAlbums = () => { albumView.classList.remove("open"); document.body.classList.remove("album-active"); video.style.opacity = "0"; canvas.style.display = "none"; particles = []; };
+    const openGig = () => { gigView.classList.add("open"); };
+    const closeGig = () => { gigView.classList.remove("open"); };
+    const closeDetail = () => { detailView.classList.remove("active"); detailIframe.src = ""; };
+    const closeMenu = () => { gallery.classList.remove("active"); };
 
     document.getElementById("starter").onclick = () => gallery.classList.add("active");
+    document.getElementById("menuClose").onclick = (e) => { e.stopPropagation(); closeMenu(); };
     document.querySelector(".album-open-btn").onclick = (e) => { e.stopPropagation(); openAlbums(); };
-    document.getElementById("albumClose").onclick = (e) => { e.stopPropagation(); closeAlbums(); };
+    document.querySelector(".gig-open-btn").onclick = (e) => { e.stopPropagation(); openGig(); };
+    document.getElementById("gigClose").onclick = (e) => { e.stopPropagation(); closeGig(); };
     document.getElementById("detailClose").onclick = (e) => { e.stopPropagation(); closeDetail(); };
 
     function updateCarousel() {
       albumItems.forEach((item, index) => {
         item.classList.remove("center", "left-1", "right-1", "focused");
         let offset = index - currentIndex;
-        if (offset < -2) offset += albumItems.length;
-        if (offset > 2) offset -= albumItems.length;
-        if (offset === 0) item.classList.add("center");
-        else if (offset === -1) item.classList.add("left-1");
-        else if (offset === 1) item.classList.add("right-1");
+        if (offset < -2) offset += albumItems.length; if (offset > 2) offset -= albumItems.length;
+        if (offset === 0) item.classList.add("center"); else if (offset === -1) item.classList.add("left-1"); else if (offset === 1) item.classList.add("right-1");
       });
     }
+
+    /* 💡 바이브 코딩 연동 핵심 리스너: 각 앨범 이미지들에 직접 마우스 호버 및 클릭 이벤트 맵핑 */
+    albumItems.forEach((item, index) => {
+      // 마우스가 올라가면 해당 이미지를 캐러셀 정중앙으로 인덱스 정렬하고 줌인 처리
+      item.addEventListener("mouseenter", () => {
+        if (!albumView.classList.contains("open") || detailView.classList.contains("active")) return;
+        currentIndex = index;
+        updateCarousel();
+        // 호버 포커스 클래스 명시 부여
+        albumItems.forEach(el => el.classList.remove("focused"));
+        item.classList.add("focused");
+      });
+
+      item.addEventListener("mouseleave", () => {
+        item.classList.remove("focused");
+      });
+
+      // 마우스로 직접 앨범을 클릭했을 때 모달 상세 팝업 오픈 매핑
+      item.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!item.classList.contains("center")) {
+          // 만약 좌우에 대기 중인 슬라이드를 눌렀다면 중앙으로 회전만 시킴
+          currentIndex = index;
+          updateCarousel();
+          return;
+        }
+        const videoUrl = item.getAttribute("data-video");
+        detailIframe.src = `${videoUrl}?autoplay=1&mute=0`;
+        detailTitle.textContent = item.getAttribute("data-title");
+        detailView.classList.add("active");
+      });
+    });
 
     async function setup() {
       const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
       gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
-        baseOptions: { modelAssetPath: "libs/gesture_recognizer.task", delegate: "GPU" },
-        runningMode: "VIDEO"
+        baseOptions: { modelAssetPath: "libs/gesture_recognizer.task", delegate: "GPU" }, runningMode: "VIDEO"
       });
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
-      video.srcObject = stream;
-      video.onloadeddata = () => predict();
+      video.srcObject = stream; video.onloadeddata = () => predict();
     }
 
     async function predict() {
-      if (video.currentTime !== lastVideoTime) {
-        lastVideoTime = video.currentTime;
-        const results = gestureRecognizer.recognizeForVideo(video, Date.now());
-
-        if (results.landmarks && results.landmarks.length > 0) {
-          const lm = results.landmarks[0];
-          const indexTip = lm[8];
-          const thumbTip = lm[4];
-          const pinkyMCP = lm[17];
-
-          const cx = (1 - indexTip.x) * window.innerWidth;
-          const cy = indexTip.y * window.innerHeight;
-          cursor.style.left = `${cx}px`;
-          cursor.style.top = `${cy}px`;
-
-          const gesture = results.gestures[0] ? results.gestures[0][0].categoryName : "";
-          const currentHandX = pinkyMCP.x;
-          const velocity = currentHandX - prevHandX;
-
-          // --- 핸드트래킹: 뒤로 가기 (오른쪽으로 밀기) ---
-          if (!isCooldown && velocity < -0.04) {
-            if (detailView.classList.contains("active")) {
-              closeDetail();
-              triggerCooldown(800);
-            } else if (albumView.classList.contains("open")) {
-              closeAlbums();
-              triggerCooldown(800);
-            } else if (gallery.classList.contains("active")) {
-              // 메인 메뉴(카드) 상태일 때 뒤로 가기 감지 시 초기 화면으로 복구
-              gallery.classList.remove("active");
-              triggerCooldown(800);
-            }
-          }
-
-          if (albumView.classList.contains("open") && !detailView.classList.contains("active")) {
-            // --- 핸드트래킹: 앨범 넘기기 (왼쪽으로 밀기) ---
-            if (!isCooldown && velocity > 0.03) {
-              currentIndex = (currentIndex + 1) % albumItems.length;
-              updateCarousel();
-              triggerCooldown(500);
-            }
-
+      if (albumView.classList.contains("open") && !detailView.classList.contains("active")) {
+        if (video.currentTime !== lastVideoTime) {
+          lastVideoTime = video.currentTime;
+          const results = gestureRecognizer.recognizeForVideo(video, Date.now());
+          if (results.landmarks && results.landmarks.length > 0) {
+            const lm = results.landmarks[0]; const indexTip = lm[8]; const pinkyMCP = lm[17];
+            currentTargetX = (1 - indexTip.x) * window.innerWidth; currentTargetY = indexTip.y * window.innerHeight;
+            const gesture = results.gestures[0] ? results.gestures[0][0].categoryName : "";
+            const currentHandX = pinkyMCP.x; const velocity = currentHandX - prevHandX;
+            if (!isCooldown && velocity < -0.04) { closeAlbums(); triggerCooldown(800); }
+            if (!isCooldown && velocity > 0.03) { currentIndex = (currentIndex + 1) % albumItems.length; updateCarousel(); triggerCooldown(500); }
             const centerItem = document.querySelector(".album-item.center");
             if (centerItem) {
               const rect = centerItem.getBoundingClientRect();
-              const isOverCenter = cx > rect.left && cx < rect.right && cy > rect.top && cy < rect.bottom;
-
-              if (isOverCenter && Math.abs(velocity) < 0.01) {
-                stopCounter++;
-                if (stopCounter > 10) centerItem.classList.add("focused");
-              } else {
-                stopCounter = 0;
-                centerItem.classList.remove("focused");
-              }
-
+              const isOverCenter = currentTargetX > rect.left && currentTargetX < rect.right && currentTargetY > rect.top && currentTargetY < rect.bottom;
+              if (isOverCenter && Math.abs(velocity) < 0.01) { stopCounter++; if (stopCounter > 10) centerItem.classList.add("focused"); } else { stopCounter = 0; if (!centerItem.matches(':hover')) centerItem.classList.remove("focused"); }
               if (gesture === "Closed_Fist" && !isCooldown && centerItem.classList.contains("focused")) {
-                document.getElementById("detailTitle").textContent = centerItem.getAttribute("data-title");
-                detailView.classList.add("active");
-                triggerCooldown(1200);
+                const videoUrl = centerItem.getAttribute("data-video");
+                detailIframe.src = `${videoUrl}?autoplay=1&mute=0`; detailTitle.textContent = centerItem.getAttribute("data-title");
+                detailView.classList.add("active"); triggerCooldown(1200);
               }
             }
-          } else {
-            // 버튼 조작 로직 (초기 로고 클릭 또는 메인 버튼들)
-            const dist = Math.sqrt(Math.pow(indexTip.x - thumbTip.x, 2) + Math.pow(indexTip.y - thumbTip.y, 2));
-            const target = document.elementFromPoint(cx, cy);
-
-            if (target) {
-              if (target.id === "detailClose" || target.id === "albumClose" || target.classList.contains("label-btn") || target.id === "starter" || target.parentElement.id === "starter") {
-                target.classList.add("btn-hovered");
-                stopCounter++;
-                if (stopCounter > 35) {
-                  // starter 로고 포함 모든 버튼 클릭 감지
-                  if (target.id === "starter" || target.parentElement.id === "starter") {
-                    gallery.classList.add("active");
-                  } else {
-                    target.click();
-                  }
-                  stopCounter = 0;
-                  triggerCooldown(1000);
-                }
-              } else {
-                stopCounter = 0;
-                document.querySelectorAll(".btn-hovered").forEach(el => el.classList.remove("btn-hovered"));
-              }
-
-              if (dist < 0.045 && !isCooldown) {
-                if (target.id === "starter" || target.parentElement.id === "starter") {
-                  gallery.classList.add("active");
-                } else {
-                  target.click();
-                }
-                triggerCooldown(1000);
-              }
-            }
+            prevHandX = currentHandX;
           }
-          prevHandX = currentHandX;
         }
-      }
+      } else { currentTargetX = 0; currentTargetY = 0; }
       requestAnimationFrame(predict);
     }
-
     function triggerCooldown(ms) { isCooldown = true; setTimeout(() => isCooldown = false, ms); }
-
     setup();
   </script>
 </body>
